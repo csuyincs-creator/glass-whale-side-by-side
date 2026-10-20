@@ -1,0 +1,14 @@
+# Dependencies — install with `npm install`
+node_modules/
+
+# Vendored three.js (25 MB of third-party build output). The left scene's
+# import map points at /vendor; run `npm run vendor` to regenerate it locally.
+vendor/
+
+# Build output from the right scene's bundler
+right/bundle.js
+
+# Local OS / editor noise
+.DS_Store
+Thumbs.db
+*.log

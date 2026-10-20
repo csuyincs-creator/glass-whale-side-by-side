@@ -1,0 +1,20 @@
+{
+  "name": "cloud-whale-split-compare",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Two independent WebGL cloud-whale scenes side by side, sharing one camera",
+  "type": "module",
+  "scripts": {
+    "start": "python serve.py 5173",
+    "serve:lan": "python serve.py 5173 0.0.0.0",
+    "vendor": "node scripts/vendor-three.mjs",
+    "build:right": "cd right && node build.mjs && mv -f cloud-whale.html scene.html && rm -f bundle.js",
+    "verify": "node verify.mjs",
+    "postinstall": "node scripts/vendor-three.mjs"
+  },
+  "dependencies": {
+    "esbuild": "^0.24.0",
+    "puppeteer-core": "^23.11.1",
+    "three": "0.170.0"
+  }
+}

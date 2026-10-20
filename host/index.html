@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Cloud Whale · 双版对照</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #02030a;
+    --seam: rgba(150, 175, 235, 0.16);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+
+  #stage {
+    position: fixed; inset: 0;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  #stage.solo-left  { grid-template-columns: 1fr; }
+  #stage.solo-right { grid-template-columns: 1fr; }
+  #stage.solo-left  #paneR, #stage.solo-right #paneL { display: none; }
+
+  .pane { position: relative; overflow: hidden; background: #02030a; }
+  .pane iframe {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    border: 0; display: block;
+    /* The host owns every pointer event; iframes never see them. */
+    pointer-events: none;
+  }
+
+  /* Hairline seam, drawn above the iframes. */
+  #seam {
+    position: fixed; left: 50%; top: 0; bottom: 0; width: 1px;
+    transform: translateX(-0.5px);
+    background: var(--seam);
+    pointer-events: none; z-index: 5;
+  }
+  #stage.solo-left #seam, #stage.solo-right #seam { display: none; }
+
+  /* Grip cursor over the whole stage: both panels drag the same camera. */
+  #stage { cursor: grab; }
+  #stage.dragging { cursor: grabbing; }
+
+  #boot {
+    position: fixed; inset: 0; z-index: 20;
+    display: grid; place-items: center;
+    background: #02030a;
+    transition: opacity 1.4s ease;
+  }
+  #boot.gone { opacity: 0; pointer-events: none; }
+  #boot i {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: #cfe2ff;
+    box-shadow: 0 0 16px 5px rgba(150, 185, 255, 0.5);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.9); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div class="pane" id="paneL">
+    <iframe id="frameL" src="../left/index.html?embed=1" allow="fullscreen"></iframe>
+  </div>
+  <div class="pane" id="paneR">
+    <iframe id="frameR" src="../right/scene.html?embed=1" allow="fullscreen"></iframe>
+  </div>
+</div>
+<div id="seam"></div>
+
+<div id="boot"><i></i></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ==================================================================
+     One camera state, two scenes.
+
+     Both scenes are framed by a cube of different physical size (half-
+     diagonal 8.66 vs 1.29 units) and different fov (28° vs 26°). The only
+     way "the same view" can mean anything is to work in a normalised frame:
+       yaw, pitch  — absolute radians, identical for both
+       k           — camera distance / cube half-diagonal
+     Each child converts k to its own world distance, so the cube fills the
+     same fraction of the panel on both sides.
+
+     The children also correct for fov: a wider fov sees more, so its distance
+     is scaled by tan(ref)/tan(fov/2) to land on the same projected size.
+     ================================================================== */
+
+  const FOV_REF = 27;                       // common reference, degrees
+  const TAN_REF = Math.tan(FOV_REF * Math.PI / 360);
+  // k = camera distance / cube half-diagonal.
+  // The cube's nearest face sits at 0.577 * half-diagonal, so 0.85 keeps the
+  // camera outside the glass while letting you push in close enough to read
+  // individual trees and the whale's veins.
+  const K_MIN = 0.85;
+  const K_MAX = 9.6;
+  const K_DEFAULT = 4.20;
+
+  const PITCH_MIN = -0.34;                  // ~ -19.5°: looking up from below
+  const PITCH_MAX = 1.40;                   // ~ 80°
+
+  const view = {
+    yaw: 0.83,
+    pitch: 0.30,
+    k: K_DEFAULT,
+  };
+
+  // Only one pointer may drive the camera at a time.
+  let activePointer = null;
+  let lastX = 0, lastY = 0;
+  let lastInteraction = performance.now();
+  const AUTO_RESUME_MS = 4500;
+  const AUTO_RATE = 0.055;                  // rad/s, shared by both panels
+
+  const frameL = document.getElementById('frameL');
+  const frameR = document.getElementById('frameR');
+  const stage = document.getElementById('stage');
+  const boot = document.getElementById('boot');
+
+  // ---- child handles -------------------------------------------------
+  const children = [];
+  function register(win, frame) {
+    if (!win || !win.__view) return false;
+    children.push({ win, frame, ...win.__view });
+    return true;
+  }
+
+  function pollChildren() {
+    const gotL = register(frameL.contentWindow, 'L');
+    const gotR = register(frameR.contentWindow, 'R');
+    return gotL && gotR;
+  }
+
+  let handlesReady = false;
+  const readyTimer = setInterval(() => {
+    if (shootHandles()) { /* noop, keep signature simple */ }
+    if (!handlesReady && pollChildren()) {
+      handlesReady = true;
+      clearInterval(readyTimer);
+      push();
+      boot.classList.add('gone');
+      setTimeout(() => boot.remove(), 1800);
+    }
+  }, 120);
+  function shootHandles() { return false; }
+
+  // Safety: never leave the veil up.
+  setTimeout(() => {
+    if (boot.parentNode) {
+      boot.classList.add('gone');
+      setTimeout(() => boot.remove(), 1800);
+    }
+  }, 20000);
+
+  // ---- push state to both panels -------------------------------------
+  function push() {
+    if (!handlesReady) return;
+    for (const c of children) {
+      try { c.win.__view.apply(view.yaw, view.pitch, view.k); } catch (_) {}
+    }
+  }
+  window.__pushLog = [];
+
+  // ---- input ----------------------------------------------------------
+  function markInteraction() {
+    lastInteraction = performance.now();
+  }
+
+  stage.addEventListener('pointerdown', (e) => {
+    if (activePointer !== null) return;
+    activePointer = e.pointerId;
+    lastX = e.clientX; lastY = e.clientY;
+    stage.classList.add('dragging');
+    stage.setPointerCapture(e.pointerId);
+    markInteraction();
+  });
+
+  stage.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== activePointer) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+
+    // Same sensitivity the two originals used, expressed per pixel.
+    view.yaw -= dx * 0.005;
+    view.pitch = Math.min(PITCH_MAX, Math.max(PITCH_MIN, view.pitch + dy * 0.0035));
+    markInteraction();
+    push();
+  });
+
+  function endDrag(e) {
+    if (e.pointerId !== activePointer) return;
+    activePointer = null;
+    stage.classList.remove('dragging');
+    try { stage.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    // Multiplicative zoom: one notch feels the same at every distance.
+    const step = Math.exp(e.deltaY * 0.0011);
+    view.k = Math.min(K_MAX, Math.max(K_MIN, view.k * step));
+    markInteraction();
+    push();
+  }, { passive: false });
+
+  // Pinch zoom, so it also works on a trackpad / touch screen.
+  let pinchStart = 0, pinchK0 = 1;
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      pinchStart = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchK0 = view.k;
+    }
+  }, { passive: true });
+  stage.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 2 || !pinchStart) return;
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    view.k = Math.min(K_MAX, Math.max(K_MIN, pinchK0 * (pinchStart / d)));
+    markInteraction();
+    push();
+  }, { passive: true });
+  stage.addEventListener('touchend', () => { pinchStart = 0; }, { passive: true });
+
+  // ---- keyboard ------------------------------------------------------
+  addEventListener('keydown', (e) => {
+    if (e.key === '1') { stage.className = 'solo-left'; }
+    else if (e.key === '2') { stage.className = 'solo-right'; }
+    else if (e.key === '0') { stage.className = ''; }
+  });
+
+  // ---- auto orbit ----------------------------------------------------
+  // Driven here rather than in either scene so the two can never drift.
+  // It advances on wall-clock time, not on accumulated per-frame dt: at low
+  // frame rates a clamped dt would make the orbit crawl, and the two panels
+  // would then disagree about how fast "idle" is.
+  let prev = performance.now();
+  let autoYaw0 = view.yaw;
+  let autoSince = null;
+
+  function tick(now) {
+    const dt = Math.min((now - prev) / 1000, 0.25);
+    prev = now;
+
+    const idle = activePointer === null && now - lastInteraction > AUTO_RESUME_MS;
+    if (idle) {
+      if (autoSince === null) { autoSince = now; autoYaw0 = view.yaw; }
+      view.yaw = autoYaw0 + ((now - autoSince) / 1000) * AUTO_RATE;
+      push();
+    } else {
+      autoSince = null;
+    }
+
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // Expose for the verification script: it needs to drive input and read state.
+  window.__split = { view, push, K_MIN, K_MAX, PITCH_MIN, PITCH_MAX };
+})();
+</script>
+</body>
+</html>

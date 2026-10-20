@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>云鲸星灵 · Cloud Whale Reliquary</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #03050a; }
+  canvas { display: block; width: 100%; height: 100%; outline: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+
+  /* No text, no buttons, no panel: the scene is the whole interface.
+     The only overlay is the opening veil, which breathes once and dissolves. */
+
+  .veil {
+    position: fixed; inset: 0; z-index: 50;
+    display: grid; place-items: center;
+    background: radial-gradient(120% 90% at 50% 46%, #0a1020 0%, #03050a 62%, #010204 100%);
+    transition: opacity 2.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* a very slow scale-down as it fades: the dark room opening, not a curtain */
+  .veil.gone {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(1.06);
+    transition: opacity 2.6s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 3.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* the seed of light that grows into the whale's core */
+  .veil .seed {
+    position: relative; width: 5px; height: 5px; border-radius: 50%;
+    background: #eaf2ff;
+    box-shadow:
+      0 0 14px 4px rgba(190, 218, 255, 0.55),
+      0 0 40px 12px rgba(120, 160, 240, 0.22),
+      0 0 90px 34px rgba(80, 110, 200, 0.10);
+    animation: seed 3.6s ease-in-out infinite;
+  }
+  .veil .seed::after {
+    content: ""; position: absolute; inset: -9px;
+    border-radius: 50%;
+    border: 1px solid rgba(180, 210, 255, 0.22);
+    animation: halo 3.6s ease-in-out infinite;
+  }
+  @keyframes seed {
+    0%, 100% { transform: scale(0.85); opacity: 0.55; }
+    50%      { transform: scale(1.25); opacity: 1; }
+  }
+  @keyframes halo {
+    0%, 100% { transform: scale(0.7); opacity: 0.15; }
+    50%      { transform: scale(1.5); opacity: 0.40; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .veil .seed, .veil .seed::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div class="veil" id="veil"><span class="seed"></span></div>
+<script>
+  (function reveal() {
+    var veil = document.getElementById('veil');
+    if (!veil) return;
+    if (window.__ready || document.body.dataset.ready === '1') {
+      // hold the veil a beat after the first frames so the intro move has begun
+      setTimeout(function () {
+        veil.classList.add('gone');
+        setTimeout(function () { veil.remove(); }, 3400);
+      }, 420);
+      return;
+    }
+    requestAnimationFrame(reveal);
+  })();
+  // last resort: never trap the viewer behind the veil
+  setTimeout(function () {
+    var veil = document.getElementById('veil');
+    if (veil && !veil.classList.contains('gone')) {
+      veil.classList.add('gone');
+      setTimeout(function () { veil.remove(); }, 3400);
+    }
+  }, 15000);
+</script>
+<script src="./bundle.js"></script>
+</body>
+</html>

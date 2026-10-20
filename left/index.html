@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cloud Whale · A Dream Ecosystem in Glass</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #02030a; overflow: hidden; }
+  canvas { display: block; }
+  .ui { position: fixed; bottom: 26px; pointer-events: none; transition: opacity .8s ease;
+        font: 300 11px/1.7 "Helvetica Neue", "Segoe UI", Arial, sans-serif; letter-spacing: .2em;
+        text-transform: uppercase; color: rgba(196, 206, 255, .45); }
+  #caption { left: 30px; }
+  #caption b { display: block; font-weight: 400; font-size: 13px; letter-spacing: .32em; color: rgba(226, 232, 255, .82); }
+  #hint { right: 30px; text-align: right; letter-spacing: .14em; }
+  .hide .ui { opacity: 0; }
+  #veil { position: fixed; inset: 0; background: #02030a; display: grid; place-items: center;
+          color: rgba(196, 206, 255, .5); font: 300 11px "Helvetica Neue", Arial, sans-serif;
+          letter-spacing: .4em; text-transform: uppercase; transition: opacity 1.6s ease; z-index: 2; }
+  #veil.gone { opacity: 0; pointer-events: none; }
+
+  /* Embedded in the side-by-side host: no chrome of our own, and the host owns
+     all camera input, so the canvas must not swallow pointer events. */
+  body.embed .ui, body.embed #veil { display: none !important; }
+  body.embed canvas { pointer-events: none; }
+</style>
+<script>
+  // Set before the module loads so main.js can branch on it immediately.
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (q.get('embed') === '1') document.documentElement.classList.add('embed');
+    window.__EMBED__ = q.get('embed') === '1';
+  })();
+</script>
+<script type="importmap">
+{ "imports": {
+    "three": "/vendor/build/three.module.js",
+    "three/addons/": "/vendor/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+  <div id="veil">condensing a tiny universe…</div>
+  <div id="caption" class="ui"><b>Cloud Whale</b>a dream ecosystem preserved in glass</div>
+  <div id="hint" class="ui">drag · orbit &nbsp;&nbsp; scroll · zoom<br>H · hide text &nbsp;&nbsp; P · save image &nbsp;&nbsp; space · pause orbit</div>
+  <script type="module" src="./main.js"></script>
+  <script>
+    if (window.__EMBED__) document.body.classList.add('embed');
+  </script>
+</body>
+</html>

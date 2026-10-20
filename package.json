@@ -1,8 +1,9 @@
 {
-  "name": "cloud-whale-split-compare",
+  "name": "glass-whale-side-by-side",
   "version": "1.0.0",
   "private": true,
-  "description": "Two independent WebGL cloud-whale scenes side by side, sharing one camera",
+  "license": "MIT",
+  "description": "Two independent WebGL glass-cube cloud-whale scenes side by side, sharing one camera",
   "type": "module",
   "scripts": {
     "start": "python serve.py 5173",
